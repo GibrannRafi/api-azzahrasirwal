@@ -2,12 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\User;
-use Illuminate\Support\Arr;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Validator;
+use Validator;
+use Hash;
 
 class AuthController extends Controller
 {
@@ -30,7 +29,7 @@ class AuthController extends Controller
         }else{
             $user = User::create([
                 'name' => $request->name,
-                'password' => Hash::make($request->password),
+                'password' => bcrypt($request->password),
                 'email' => $request->email,
             ]);
 
@@ -44,7 +43,7 @@ class AuthController extends Controller
                 ],422);
             }
         
-            $token = $user->createToken($user->$email.'token-name')->plainTextToken;
+            $token = $user->createToken('token-name')->plainTextToken;
 
             return response()->json([
                 'status'    => 'Success',
@@ -55,51 +54,84 @@ class AuthController extends Controller
             ], 200);
         }
     }
+
     public function login(Request $request)
     {
-        $validate = Validator::make($request->all(), [
-            'email' => 'required',
-            'password' => 'required',
-        ]);
+        $rules = array(
+            'email' => 'required|string|email|',
+            'password' => 'required|string|min:5',
+        );
 
-        if($validate->fails()){
-            $respons = [
-                'status'    => 'error',
-                'msg'       => 'Validator error',
-                'errors'    => $validate->errors(),
-                'content'   => null,
-            ];
-            return response()->json($respons, 200);
+        $cek = Validator::make($request->all(),$rules);
+
+        if($cek->fails()){
+            $errorString = implode(",",$cek->messages()->all());
+            return response()->json([
+                'message' => $errorString
+            ], 401);
         }else{
-            $credentials    = request(['email', 'password']);
-            $credentials    = Arr::add($credentials, 'status', 'aktif');
-            if(!Auth::attempt($credentials)){
-                $respons = [
-                    'status'    => 'error',
-                    'msg'       => 'Unathorized',
-                    'errors'    => null,
-                    'content'   => null,
-                ];
-                return response()->json($respons, 401);
-            }
+            $user = User::where('email',$request->email)->first();
 
-            $user   = User::where('email', $request->email)->first();
-            if(! Hash::check($request->password, $user->password, [])){
-                throw new Exception('Error in login');
+            if (!$user || !Hash::check($request->password, $user->password)) {
+                return response()->json([
+                    'message' => 'Unauthorized'
+                ],401);
             }
+        
+            $token = $user->createToken('token-name')->plainTextToken;
+            $roles = $user->getRoleNames();
 
-            $tokenResult = $user->createToken($user->$email.'token-auth')->plainTextToken;
-             $respons = [
-                    'status'    => 'success',
-                    'msg'       => 'Login Successfully', 
-                    'token'     => $tokenResult,
-                    'errors'    => null,
-                    'content'   => [
-                        'status_code'   => 200,
-                        'token_type'    => 'Bearer',
-                    ],
-                ];
-                return response()->json($respons, 200);
+            return response()->json([
+                'status'    => 'Success',
+                'message'   => 'Berhasil Login',
+                'role'      => $roles,
+                'user'      => $user,
+                'token'     => $token,
+            ], 200);
+        }
+    }
+    public function registerAdmin(Request $request)
+    {
+        $rules = array(
+            'name' => 'required|string|max:225',
+            'email' => 'required|string|email|unique:users,email',
+            'password' => 'required|string|min:5|confirmed',
+            // 'role' => 'required|max:1',
+        );
+
+        $cek = Validator::make($request->all(),$rules);
+
+        if($cek->fails()){
+            $errorString = implode(",",$cek->messages()->all());
+            return response()->json([
+                'message' => $errorString
+            ], 401);
+        }else{
+            $user = User::create([
+                'name' => $request->name,
+                'password' => bcrypt($request->password),
+                'email' => $request->email,
+            ]);
+
+            if ($user) {
+                $user->assignRole('admin');
+                $role = "admin";
+            }else{
+                return response()->json([
+                    'status'    => 'Failed',
+                    'message'   => 'gagal',
+                ],422);
+            }
+        
+            $token = $user->createToken('token-name')->plainTextToken;
+
+            return response()->json([
+                'status'    => 'Success',
+                'message'   => 'Berhasil Membuat Akun',
+                'role'      => $role,
+                'user'      => $user,
+                'token'     => $token,
+            ], 200);
         }
     }
 }
