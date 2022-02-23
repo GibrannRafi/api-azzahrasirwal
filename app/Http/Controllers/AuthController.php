@@ -7,6 +7,8 @@ use Illuminate\Http\Request;
 use App\Models\User;
 use Validator;
 use Hash;
+use Auth;
+use HashRoles;
 
 class AuthController extends Controller
 {
@@ -31,19 +33,22 @@ class AuthController extends Controller
                 'name' => $request->name,
                 'password' => bcrypt($request->password),
                 'email' => $request->email,
+                'role' => 1
             ]);
 
-            if ($user) {
+            if ($user->role == 1) {
                 $user->assignRole('user');
-                $role = "user";
+             
             }else{
                 return response()->json([
                     'status'    => 'Failed',
                     'message'   => 'gagal',
+                    
                 ],422);
             }
         
             $token = $user->createToken('token-name')->plainTextToken;
+            $roles = $user->getRoleNames();
 
             return response()->json([
                 'status'    => 'Success',
