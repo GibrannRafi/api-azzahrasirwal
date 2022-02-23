@@ -43,12 +43,13 @@ class AuthController extends Controller
                 return response()->json([
                     'status'    => 'Failed',
                     'message'   => 'gagal',
+                    'user'      => $user
                     
                 ],422);
             }
         
             $token = $user->createToken('token-name')->plainTextToken;
-            $roles = $user->getRoleNames();
+            $role = $user->getRoleNames();
 
             return response()->json([
                 'status'    => 'Success',
